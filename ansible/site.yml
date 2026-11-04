@@ -5,17 +5,16 @@
   roles:
     - kafka
 
-# 2. CREATE KAFKA TOPIC
 - name: Create Video Upload Topic on Kafka
   hosts: kafka[0]
   become: yes
   tasks:
-    - name: Wait until Kafka broker is actually listening on port 9092
+    - name: Wait for Kafka broker port 9092 to be actively open
       ansible.builtin.wait_for:
         host: "{{ ansible_default_ipv4.address }}"
         port: 9092
         state: started
-        timeout: 90
+        timeout: 120
         delay: 5
 
     - name: Ensure video-upload-topic exists
@@ -26,51 +25,54 @@
           --partitions 3 \
           --topic video-upload-topic
       register: topic_out
-      retries: 6
+      retries: 5
       delay: 5
       until: topic_out.rc == 0
-      
-            
-# 3. DEPLOY NETFLIX FRONTEND & CONSUMER
+
 - name: Deploy Netflix Frontend App & S3 Connector
   hosts: netflix_app
   become: yes
   vars:
     ansible_host: "{{ public_ip_address }}"
-    kafka_broker_ip: "{{ hostvars[groups['kafka'][0]]['ansible_default_ipv4']['address'] }}
+    kafka_broker_ip: "{{ hostvars[groups['kafka'][0]]['ansible_default_ipv4']['address'] }}"
   tasks:
     - name: Install dependencies
-      apt:
-        name: [nodejs, npm, python3-pip]
+      ansible.builtin.apt:
+        name:
+          - nodejs
+          - npm
+          - python3-pip
         state: present
         update_cache: yes
       when: ansible_os_family == "Debian"
 
     - name: Install Python Kafka and Boto3
-      pip:
-        name: [kafka-python, boto3]
+      ansible.builtin.pip:
+        name:
+          - kafka-python
+          - boto3
 
     - name: Ensure app directory exists
-      file:
+      ansible.builtin.file:
         path: /opt/netflix-app
         state: directory
         owner: ubuntu
         mode: '0755'
 
     - name: Copy App Code
-      copy:
+      ansible.builtin.copy:
         src: ../app/
         dest: /opt/netflix-app/
         owner: ubuntu
         mode: '0755'
 
     - name: Install NPM Packages
-      command: npm install
+      ansible.builtin.command: npm install
       args:
         chdir: /opt/netflix-app
 
     - name: Systemd Service for App
-      copy:
+      ansible.builtin.copy:
         dest: /etc/systemd/system/netflix-app.service
         content: |
           [Unit]
@@ -89,7 +91,7 @@
           WantedBy=multi-user.target
 
     - name: Systemd Service for S3 Watcher
-      copy:
+      ansible.builtin.copy:
         dest: /etc/systemd/system/s3-watcher.service
         content: |
           [Unit]
@@ -108,8 +110,8 @@
           [Install]
           WantedBy=multi-user.target
 
-    - name: Start Services
-      systemd:
+    - name: Reload systemd and start services
+      ansible.builtin.systemd:
         daemon_reload: yes
         name: "{{ item }}"
         state: restarted
