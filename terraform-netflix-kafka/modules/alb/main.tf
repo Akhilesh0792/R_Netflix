@@ -2,8 +2,8 @@ resource "aws_lb" "alb" {
   name               = "${var.project_name}-alb"
   internal           = false
   load_balancer_type = "application"
-  security_groups    = [var.alb_security_group_id]
-  subnets            = var.public_subnet_ids
+  security_groups    = var.security_group_ids
+  subnets            = var.subnet_ids
 
   tags = {
     Name = "${var.project_name}-alb"
@@ -46,6 +46,6 @@ resource "aws_lb_listener" "http" {
 
 resource "aws_lb_target_group_attachment" "frontend" {
   target_group_arn = aws_lb_target_group.tg.arn
-  target_id        = var.frontend_instance_id
+  target_id        = var.target_instance_id
   port             = 5000
 }
