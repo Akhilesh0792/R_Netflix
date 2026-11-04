@@ -10,14 +10,22 @@
   hosts: kafka[0]
   become: yes
   tasks:
+    - name: Wait 25 seconds for Kafka broker & Zookeeper quorum to be fully UP
+      pause:
+        seconds: 25
+
     - name: Ensure video-upload-topic exists
       shell: |
         /opt/kafka/bin/kafka-topics.sh --create --if-not-exists \
-          --bootstrap-server localhost:9092 \
+          --bootstrap-server {{ ansible_default_ipv4.address }}:9092 \
           --replication-factor 1 \
           --partitions 3 \
           --topic video-upload-topic
-
+      register: topic_out
+      retries: 5
+      delay: 5
+      until: topic_out.rc == 0
+      
 # 3. DEPLOY NETFLIX FRONTEND & CONSUMER
 - name: Deploy Netflix Frontend App & S3 Connector
   hosts: netflix_app
