@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Netflix Stream - Live S3 & Kafka</title>
+  <style>
+    body { background-color: #141414; color: #fff; font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 20px; }
+    h1 { color: #E50914; font-size: 2.2rem; margin-bottom: 25px; }
+    .video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+    .video-card { background: #222; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+    video { width: 100%; height: 200px; background: #000; }
+    .video-info { padding: 12px; }
+    .video-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 6px; }
+    .badge { background: #E50914; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>NETFLIX STREAM</h1>
+  <div class="video-grid" id="videoGrid"></div>
+
+  <script>
+    const grid = document.getElementById('videoGrid');
+    const ws = new WebSocket(`ws://${window.location.host}`);
+
+    function renderCard(item) {
+      if (document.getElementById(`video-${item.title}`)) return;
+      const card = document.createElement('div');
+      card.className = 'video-card';
+      card.id = `video-${item.title}`;
+      card.innerHTML = `
+        <video controls preload="metadata">
+          <source src="${item.video_url}" type="video/mp4">
+          Browser does not support playback.
+        </video>
+        <div class="video-info">
+          <span class="badge">S3 LIVE</span>
+          <div class="video-title">${item.title}</div>
+        </div>
+      `;
+      grid.prepend(card);
+    }
+
+    ws.onmessage = (event) => {
+      const msg = JSON.parse(event.data);
+      if (msg.type === 'INIT') {
+        msg.data.forEach(renderCard);
+      } else if (msg.type === 'NEW_VIDEO') {
+        renderCard(msg.data);
+      }
+    };
+  </script>
+</body>
+</html>

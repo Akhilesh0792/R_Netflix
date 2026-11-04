@@ -1,0 +1,11 @@
+plugin: amazon.aws.aws_ec2
+regions:
+  - ap-south-1
+filters:
+  instance-state-name: running
+  tag:Project: "netflix-kafka"
+keyed_groups:
+  - key: tags.Role
+    separator: ""
+compose:
+  ansible_host: private_ip_address

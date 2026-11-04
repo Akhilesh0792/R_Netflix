@@ -1,0 +1,24 @@
+---
+# Kafka Version specific variables
+kafka_version: "3.7.0"
+scala_version: "2.13"
+
+# Installation Paths & Data Dirs
+kafka_install_dir: "/opt/kafka"
+kafka_data_dir: "/var/lib/kafka-logs"
+zookeeper_data_dir: "/var/lib/zookeeper"
+
+# System User
+kafka_user: "kafka"
+kafka_group: "kafka"
+
+# Cluster & Network Configuration
+kafka_port: 9092
+zookeeper_port: 2181
+kafka_num_partitions: 3
+kafka_default_replication_factor: 2
+kafka_log_retention_hours: 168
+
+# JVM Memory tuning for t2.micro / low-spec instances
+kafka_jvm_heap: "-Xmx512M -Xms512M"
+zookeeper_jvm_heap: "-Xmx256M -Xms256M"

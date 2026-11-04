@@ -1,0 +1,26 @@
+---
+- name: Ensure Kafka system group exists
+  ansible.builtin.group:
+    name: "{{ kafka_group }}"
+    state: present
+    system: yes
+
+- name: Ensure Kafka system user exists
+  ansible.builtin.user:
+    name: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    shell: /sbin/nologin
+    system: yes
+    create_home: no
+
+- name: Create directories for Kafka and Zookeeper
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    mode: '0755'
+  loop:
+    - "{{ kafka_install_dir }}"
+    - "{{ kafka_data_dir }}"
+    - "{{ zookeeper_data_dir }}"

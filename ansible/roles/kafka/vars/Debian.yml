@@ -1,0 +1,5 @@
+---
+java_packages:
+  - openjdk-17-jdk
+  - tar
+  - wget

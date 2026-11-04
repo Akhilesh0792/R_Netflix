@@ -1,0 +1,12 @@
+---
+- name: Include OS prerequisites
+  ansible.builtin.import_tasks: install_prereqs.yml
+
+- name: Include user and directory setup
+  ansible.builtin.import_tasks: setup_user.yml
+
+- name: Include Kafka binary installation
+  ansible.builtin.import_tasks: install_kafka.yml
+
+- name: Include configuration and service setup
+  ansible.builtin.import_tasks: configure.yml

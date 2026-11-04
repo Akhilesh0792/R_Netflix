@@ -1,0 +1,113 @@
+---
+- name: Setup Kafka on Brokers via Assignment Role
+  hosts: Role_kafka
+  become: yes
+  roles:
+    - kafka
+
+- name: Create Video Upload Topic on Kafka
+  hosts: Role_kafka[0]
+  become: yes
+  tasks:
+    - name: Ensure video-upload-topic exists
+      shell: |
+        /opt/kafka/bin/kafka-topics.sh --create --if-not-exists \
+          --bootstrap-server localhost:9092 \
+          --replication-factor 1 \
+          --partitions 3 \
+          --topic video-upload-topic
+
+# 3. DEPLOY NETFLIX CONSUMER & S3 WATCHER ON FRONTEND
+- name: Deploy Netflix Frontend App & S3 Connector
+  hosts: Role_netflix_app
+  become: yes
+  vars:
+    # Dynamic inventory se Kafka broker 1 ka private IP auto-pick hoga
+    kafka_broker_ip: "{{ hostvars[groups['Role_kafka'][0]]['ansible_host'] }}"
+  tasks:
+    - name: Install Node.js, NPM, Python and pip
+      apt:
+        name: [nodejs, npm, python3-pip]
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Install dependencies (RHEL/CentOS)
+      yum:
+        name: [nodejs, npm, python3-pip]
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Install Python Kafka and Boto3 libraries
+      pip:
+        name:
+          - kafka-python
+          - boto3
+
+    - name: Ensure app directory exists
+      file:
+        path: /opt/netflix-app
+        state: directory
+        owner: ubuntu
+        mode: '0755'
+
+    - name: Copy Netflix App code to Frontend node
+      copy:
+        src: ../app/
+        dest: /opt/netflix-app/
+        owner: ubuntu
+        mode: '0755'
+
+    - name: Install Node modules
+      command: npm install
+      args:
+        chdir: /opt/netflix-app
+
+    - name: Create Systemd service for Netflix Web UI & Consumer
+      copy:
+        dest: /etc/systemd/system/netflix-app.service
+        content: |
+          [Unit]
+          Description=Netflix Consumer App
+          After=network.target
+
+          [Service]
+          Type=simple
+          User=ubuntu
+          WorkingDirectory=/opt/netflix-app
+          Environment=KAFKA_BROKER={{ kafka_broker_ip }}:9092
+          ExecStart=/usr/bin/node server.js
+          Restart=always
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Create Systemd service for S3 Watcher Producer
+      copy:
+        dest: /etc/systemd/system/s3-watcher.service
+        content: |
+          [Unit]
+          Description=S3 Event to Kafka Watcher
+          After=network.target
+
+          [Service]
+          Type=simple
+          User=ubuntu
+          WorkingDirectory=/opt/netflix-app
+          Environment=KAFKA_BROKER={{ kafka_broker_ip }}:9092
+          Environment=S3_BUCKET_NAME={{ s3_bucket_name }}
+          ExecStart=/usr/bin/python3 s3_watcher.py
+          Restart=always
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Enable and restart Netflix and S3 services
+      systemd:
+        daemon_reload: yes
+        name: "{{ item }}"
+        state: restarted
+        enabled: yes
+      loop:
+        - netflix-app
+        - s3-watcher
