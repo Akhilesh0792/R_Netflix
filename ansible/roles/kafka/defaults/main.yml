@@ -22,3 +22,6 @@ kafka_log_retention_hours: 168
 # JVM Memory tuning for t2.micro / low-spec instances
 kafka_jvm_heap: "-Xmx512M -Xms512M"
 zookeeper_jvm_heap: "-Xmx256M -Xms256M"
+
+# Dynamic Broker ID (Neeche yeh add karein)
+broker_id: "{{ groups['kafka'].index(inventory_hostname) + 1 }}"
