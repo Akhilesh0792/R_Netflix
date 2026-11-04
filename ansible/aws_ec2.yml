@@ -8,4 +8,4 @@ keyed_groups:
   - key: tags.Role
     separator: ""
 compose:
-  ansible_host: private_ip_address
+  ansible_host: private_ip_address | default(private_ip_address)
