@@ -1,8 +1,8 @@
 [Unit]
-Description=Apache Kafka Distributed Message Broker
+Description=Apache Kafka Server
 Documentation=http://kafka.apache.org/documentation.html
-After=network.target zookeeper.service
 Requires=zookeeper.service
+After=zookeeper.service
 
 [Service]
 Type=simple
@@ -11,7 +11,8 @@ Group={{ kafka_group }}
 Environment="KAFKA_HEAP_OPTS={{ kafka_jvm_heap }}"
 ExecStart={{ kafka_install_dir }}/bin/kafka-server-start.sh {{ kafka_install_dir }}/config/server.properties
 ExecStop={{ kafka_install_dir }}/bin/kafka-server-stop.sh
-Restart=on-failure
+Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target

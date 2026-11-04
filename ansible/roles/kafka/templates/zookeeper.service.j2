@@ -1,5 +1,5 @@
 [Unit]
-Description=Apache Zookeeper Service
+Description=Apache Zookeeper Server
 Documentation=http://zookeeper.apache.org
 After=network.target
 
@@ -10,7 +10,8 @@ Group={{ kafka_group }}
 Environment="KAFKA_HEAP_OPTS={{ zookeeper_jvm_heap }}"
 ExecStart={{ kafka_install_dir }}/bin/zookeeper-server-start.sh {{ kafka_install_dir }}/config/zookeeper.properties
 ExecStop={{ kafka_install_dir }}/bin/zookeeper-server-stop.sh
-Restart=on-failure
+Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
