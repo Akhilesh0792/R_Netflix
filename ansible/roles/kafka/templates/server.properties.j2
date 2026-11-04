@@ -26,3 +26,8 @@ log.retention.check.interval.ms=300000
 zookeeper.connect=127.0.0.1:2181
 zookeeper.connection.timeout.ms=18000
 group.initial.rebalance.delay.ms=0
+
+############################# Internal Topic Settings (Coordinator Fix) #############################
+offsets.topic.replication.factor=1
+transaction.state.log.replication.factor=1
+transaction.state.log.min.isr=1
