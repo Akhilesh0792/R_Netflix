@@ -1,7 +1,9 @@
-broker.id={{ groups['Role_kafka'].index(inventory_hostname) + 1 }}
+############################# Socket Server Settings #############################
+broker.id={{ broker_id }}
+port={{ kafka_port | default(9092) }}
 
-listeners=PLAINTEXT://{{ ansible_default_ipv4.address }}:9092
-advertised.listeners=PLAINTEXT://{{ ansible_default_ipv4.address }}:9092
+listeners=PLAINTEXT://0.0.0.0:{{ kafka_port | default(9092) }}
+advertised.listeners=PLAINTEXT://{{ ansible_default_ipv4.address }}:{{ kafka_port | default(9092) }}
 
 num.network.threads=3
 num.io.threads=8
@@ -9,15 +11,19 @@ socket.send.buffer.bytes=102400
 socket.receive.buffer.bytes=102400
 socket.request.max.bytes=104857600
 
-log.dirs={{ kafka_log_dir | default('/var/log/kafka') }}
-num.partitions=3
+############################# Log Basics #############################
+log.dirs={{ kafka_data_dir | default('/var/lib/kafka-logs') }}
+num.partitions={{ kafka_num_partitions | default(3) }}
 num.recovery.threads.per.data.dir=1
+default.replication.factor={{ kafka_default_replication_factor | default(2) }}
 
-{% if groups['Role_zookeeper'] is defined and groups['Role_zookeeper'] | length > 0 %}
-zookeeper.connect={{ groups['Role_zookeeper'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | join(':2181,') }}:2181
-{% else %}
-# Agar single node ya kafka broker 1 par hi zookeeper chal raha hai:
-zookeeper.connect={{ hostvars[groups['Role_kafka'][0]]['ansible_default_ipv4']['address'] }}:2181
-{% endif %}
+############################# Log Retention #############################
+log.retention.hours={{ kafka_log_retention_hours | default(168) }}
+log.segment.bytes=1073741824
+log.retention.check.interval.ms=300000
+
+############################# Zookeeper Connection #############################
+zookeeper.connect={% for host in groups['kafka'] %}{{ hostvars[host]['ansible_default_ipv4']['address'] }}:2181{% if not loop.last %},{% endif %}{% endfor %}
 
 zookeeper.connection.timeout.ms=18000
+group.initial.rebalance.delay.ms=0
