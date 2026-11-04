@@ -1,13 +1,4 @@
-dataDir={{ zookeeper_data_dir }}
-clientPort={{ zookeeper_port }}
-maxClientCnxns=60
-admin.enableServer=falsedataDir={{ zookeeper_data_dir | default('/var/lib/zookeeper') }}
+dataDir={{ zookeeper_data_dir | default('/var/lib/zookeeper') }}
 clientPort={{ zookeeper_port | default(2181) }}
 maxClientCnxns=0
 admin.enableServer=false
-initLimit=10
-syncLimit=5
-
-{% for host in groups['kafka'] %}
-server.{{ loop.index }}={{ hostvars[host]['ansible_default_ipv4']['address'] }}:2888:3888
-{% endfor %}
