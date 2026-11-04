@@ -36,7 +36,8 @@
   hosts: netflix_app
   become: yes
   vars:
-    kafka_broker_ip: "{{ hostvars[groups['kafka'][0]]['ansible_host'] }}"
+    ansible_host: "{{ public_ip_address }}"
+    kafka_broker_ip: "{{ hostvars[groups['kafka'][0]]['ansible_default_ipv4']['address'] }}
   tasks:
     - name: Install dependencies
       apt:
