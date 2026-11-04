@@ -19,5 +19,5 @@ output "s3_bucket_name" {
 output "app_public_dns" {
   description = "Public IP or ALB DNS for Netflix App"
   value = module.alb.alb_dns_name
-  value = module.netflix_frontend.public_ip
+ # value = module.netflix_frontend.public_ip
 }
