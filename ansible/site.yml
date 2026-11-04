@@ -1,10 +1,12 @@
 ---
+# 1. KAFKA CLUSTER SETUP
 - name: Setup Kafka on Brokers via Assignment Role
   hosts: kafka
   become: yes
   roles:
     - kafka
 
+# 2. CREATE KAFKA TOPIC
 - name: Create Video Upload Topic on Kafka
   hosts: kafka[0]
   become: yes
@@ -29,6 +31,7 @@
       delay: 5
       until: topic_out.rc == 0
 
+# 3. DEPLOY NETFLIX FRONTEND & CONSUMER
 - name: Deploy Netflix Frontend App & S3 Connector
   hosts: netflix_app
   become: yes
@@ -36,7 +39,7 @@
     ansible_host: "{{ public_ip_address }}"
     kafka_broker_ip: "{{ hostvars[groups['kafka'][0]]['ansible_default_ipv4']['address'] }}"
   tasks:
-    - name: Install dependencies via apt (including python kafka and boto3)
+    - name: Install dependencies via apt
       ansible.builtin.apt:
         name:
           - nodejs
@@ -79,6 +82,7 @@
           Type=simple
           User=ubuntu
           WorkingDirectory=/opt/netflix-app
+          Environment=PORT=5000
           Environment=KAFKA_BROKER={{ kafka_broker_ip }}:9092
           ExecStart=/usr/bin/node server.js
           Restart=always
@@ -115,3 +119,31 @@
       loop:
         - netflix-app
         - s3-watcher
+
+    - name: Sync existing S3 videos into Kafka on launch
+      ansible.builtin.shell: |
+        python3 - << 'PYEOF'
+        import boto3, json
+        from kafka import KafkaProducer
+
+        s3 = boto3.client('s3')
+        producer = KafkaProducer(
+            bootstrap_servers=['{{ kafka_broker_ip }}:9092'],
+            value_serializer=lambda v: json.dumps(v).encode('utf-8')
+        )
+
+        response = s3.list_objects_v2(Bucket='{{ s3_bucket_name }}')
+        for item in response.get('Contents', []):
+            key = item['Key']
+            if key.lower().endswith(('.mp4', '.mkv', '.webm')):
+                msg = {
+                    'event': 'video_upload',
+                    'bucket': '{{ s3_bucket_name }}',
+                    'key': key,
+                    'url': f"https://{{ s3_bucket_name }}.s3.amazonaws.com/{key}"
+                }
+                producer.send('video-upload-topic', msg)
+        producer.flush()
+        PYEOF
+      args:
+        chdir: /opt/netflix-app
