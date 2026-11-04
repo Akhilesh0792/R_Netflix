@@ -4,37 +4,58 @@ import json
 import boto3
 from kafka import KafkaProducer
 
-AWS_REGION = os.getenv("AWS_DEFAULT_REGION", "ap-south-1")
-BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
-KAFKA_BROKER = os.getenv("KAFKA_BROKER", "localhost:9092")
-TOPIC = "video-upload-topic"
+# Environment variables
+BUCKET_NAME = os.environ.get('S3_BUCKET_NAME', 'akhilesh07')
+KAFKA_BROKER = os.environ.get('KAFKA_BROKER', '192.168.20.130:9092')
+AWS_REGION = os.environ.get('AWS_REGION', 'ap-south-1')
 
-s3 = boto3.client("s3", region_name=AWS_REGION)
-producer = KafkaProducer(
-    bootstrap_servers=[KAFKA_BROKER],
-    value_serializer=lambda v: json.dumps(v).encode("utf-8")
-)
+s3 = boto3.client('s3', region_name=AWS_REGION)
 
-seen_objects = set()
+# Wait and initialize Kafka producer
+producer = None
+while not producer:
+    try:
+        producer = KafkaProducer(
+            bootstrap_servers=[KAFKA_BROKER],
+            value_serializer=lambda v: json.dumps(v).encode('utf-8')
+        )
+        print(f"Connected to Kafka at {KAFKA_BROKER}")
+    except Exception as e:
+        print(f"Waiting for Kafka broker... {e}")
+        time.sleep(3)
+
+seen_keys = set()
 
 def poll_s3():
-    print(f"Monitoring S3 bucket: {BUCKET_NAME} for new videos...")
-    while True:
-        try:
-            resp = s3.list_objects_v2(Bucket=BUCKET_NAME)
-            if "Contents" in resp:
-                for obj in resp["Contents"]:
-                    key = obj["Key"]
-                    if key.endswith(('.mp4', '.mkv', '.mov')) and key not in seen_objects:
-                        seen_objects.add(key)
-                        url = f"https://{BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/{key}"
-                        payload = {"title": key, "video_url": url, "timestamp": str(obj["LastModified"])}
-                        producer.send(TOPIC, value=payload)
-                        producer.flush()
-                        print(f"Event published to Kafka: {payload}")
-        except Exception as e:
-            print("Error polling S3:", e)
-        time.sleep(5)
+    global seen_keys
+    try:
+        response = s3.list_objects_v2(Bucket=BUCKET_NAME)
+        if 'Contents' in response:
+            for item in response['Contents']:
+                key = item['Key']
+                # Ignore folder paths and check for valid video files
+                if not key.endswith('/') and key.lower().endswith(('.mp4', '.mkv', '.webm')):
+                    if key not in seen_keys:
+                        # Construct actual direct URL for the uploaded video
+                        video_url = f"https://{BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/{key}"
+                        
+                        message = {
+                            "event": "video_upload",
+                            "bucket": BUCKET_NAME,
+                            "key": key,
+                            "title": key.split('/')[-1],
+                            "url": video_url
+                        }
+                        
+                        print(f"Publishing new video to Kafka: {key} -> {video_url}")
+                        producer.send('video-upload-topic', message)
+                        seen_keys.add(key)
+            producer.flush()
+    except Exception as e:
+        print(f"Error polling S3: {e}")
 
-if __name__ == "__main__":
-    poll_s3()
+if __name__ == '__main__':
+    print(f"Starting S3 watcher on bucket: {BUCKET_NAME}")
+    while True:
+        poll_s3()
+        time.sleep(5)
