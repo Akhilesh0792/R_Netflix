@@ -1,12 +1,13 @@
 ---
 - name: Setup Kafka on Brokers via Assignment Role
-  hosts: Role_kafka
+  hosts: kafka
   become: yes
   roles:
     - kafka
 
+# 2. CREATE KAFKA TOPIC
 - name: Create Video Upload Topic on Kafka
-  hosts: Role_kafka[0]
+  hosts: kafka[0]
   become: yes
   tasks:
     - name: Ensure video-upload-topic exists
@@ -17,32 +18,23 @@
           --partitions 3 \
           --topic video-upload-topic
 
-# 3. DEPLOY NETFLIX CONSUMER & S3 WATCHER ON FRONTEND
+# 3. DEPLOY NETFLIX FRONTEND & CONSUMER
 - name: Deploy Netflix Frontend App & S3 Connector
-  hosts: Role_netflix_app
+  hosts: netflix_app
   become: yes
   vars:
-    # Dynamic inventory se Kafka broker 1 ka private IP auto-pick hoga
-    kafka_broker_ip: "{{ hostvars[groups['Role_kafka'][0]]['ansible_host'] }}"
+    kafka_broker_ip: "{{ hostvars[groups['kafka'][0]]['ansible_host'] }}"
   tasks:
-    - name: Install Node.js, NPM, Python and pip
+    - name: Install dependencies
       apt:
         name: [nodejs, npm, python3-pip]
         state: present
         update_cache: yes
       when: ansible_os_family == "Debian"
 
-    - name: Install dependencies (RHEL/CentOS)
-      yum:
-        name: [nodejs, npm, python3-pip]
-        state: present
-      when: ansible_os_family == "RedHat"
-
-    - name: Install Python Kafka and Boto3 libraries
+    - name: Install Python Kafka and Boto3
       pip:
-        name:
-          - kafka-python
-          - boto3
+        name: [kafka-python, boto3]
 
     - name: Ensure app directory exists
       file:
@@ -51,19 +43,19 @@
         owner: ubuntu
         mode: '0755'
 
-    - name: Copy Netflix App code to Frontend node
+    - name: Copy App Code
       copy:
         src: ../app/
         dest: /opt/netflix-app/
         owner: ubuntu
         mode: '0755'
 
-    - name: Install Node modules
+    - name: Install NPM Packages
       command: npm install
       args:
         chdir: /opt/netflix-app
 
-    - name: Create Systemd service for Netflix Web UI & Consumer
+    - name: Systemd Service for App
       copy:
         dest: /etc/systemd/system/netflix-app.service
         content: |
@@ -82,7 +74,7 @@
           [Install]
           WantedBy=multi-user.target
 
-    - name: Create Systemd service for S3 Watcher Producer
+    - name: Systemd Service for S3 Watcher
       copy:
         dest: /etc/systemd/system/s3-watcher.service
         content: |
@@ -102,7 +94,7 @@
           [Install]
           WantedBy=multi-user.target
 
-    - name: Enable and restart Netflix and S3 services
+    - name: Start Services
       systemd:
         daemon_reload: yes
         name: "{{ item }}"
